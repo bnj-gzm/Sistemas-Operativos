@@ -1,80 +1,174 @@
-Tecnologías utilizadas
-Ubuntu 22.04 / 24.04
+# Proyecto: Servidor RTMP Local con OBS y VLC
 
-Docker & Docker Compose
+ 
+Este proyecto implementa un sistema de transmisión de video en tiempo real (RTMP) completamente local utilizando Docker, OBS Studio como emisor y VLC como receptor. Se utilizó Wireshark para capturar el tráfico de red y analizar los paquetes RTMP.
 
-Node.js (servidor RTMP en CoffeeScript)
+Demostración en vivo: No aplica (sistema local)
 
-OBS Studio
+---
 
-VLC Media Player
+## Tabla de contenido
 
-Wireshark (análisis de red)
+- [Información general](#información-general)
+- [Tecnologías utilizadas](#tecnologías-utilizadas)
+- [Características](#características)
+- [Capturas de pantalla](#capturas-de-pantalla)
+- [Configuración](#configuración)
+- [Uso](#uso)
+- [Estado del proyecto](#estado-del-proyecto)
+- [Margen de mejora](#margen-de-mejora)
+- [Expresiones de gratitud](#expresiones-de-gratitud)
+- [Contacto](#contacto)
 
-Instalación
-Clonar el repositorio base del servidor RTMP:
+---
 
+## Información general
 
+Este proyecto busca implementar un flujo de transmisión RTMP desde un cliente emisor (OBS Studio) a un servidor personalizado alojado en Docker, y visualizar el contenido desde un cliente receptor (VLC), todo ejecutado en una misma máquina (localhost).
+
+Se desarrolló como parte de una tarea académica en el área de redes y servicios.
+
+Objetivos:
+
+- Levantar un servidor RTMP local
+- Emitir en tiempo real desde OBS
+- Recibir el stream con VLC
+- Capturar y analizar los paquetes en Wireshark
+
+---
+
+## Tecnologías utilizadas
+
+- Ubuntu 22.04
+- Docker 24.0+
+- Node.js 18.x (con CoffeeScript)
+- OBS Studio
+- VLC Media Player
+- Wireshark
+
+---
+
+##  Características
+
+- Transmisión RTMP en tiempo real
+- Configuración completamente local (no requiere internet)
+- Análisis de tráfico TCP/RTMP en Wireshark
+- Contenedor Docker totalmente funcional
+- Configuración reproducible paso a paso
+
+---
+
+## Capturas de pantalla
+
+OBS configurado como emisor RTMP:  
+![OBS Studio](imagenes/obs-config.png)
+
+VLC recibiendo el stream:  
+![VLC](imagenes/vlc-stream.png)
+
+Wireshark mostrando tráfico RTMP:  
+![Wireshark](imagenes/wireshark-packets.png)
+
+---
+
+## Configuración
+
+Requisitos:
+
+- Docker y Docker Compose instalados
+- Flatpak (para instalar OBS)
+- git
+- VLC Media Player
+- Wireshark
+
+Configuración local:
+
+```bash
 git clone https://github.com/iizukanao/node-rtsp-rtmp-server.git
-Crear la estructura del proyecto:
-
-
 mkdir -p ~/rtmp-project/rtmp-server
 mv node-rtsp-rtmp-server ~/rtmp-project/rtmp-server/
-Crear el Dockerfile dentro de rtmp-server:
+cd ~/rtmp-project
+```
+Crear archivo docker-compose.yml:
+```bash
+version: '3'
+services:
+  rtmp-server:
+    build: ./rtmp-server
+    ports:
+      - "1935:1935"
+    container_name: rtmp-server
+```
+Crear Dockerfile dentro de rtmp-server:
 
-(Ver sección Dockerfile)
+```bash
+FROM node:18
+RUN apt-get update && apt-get install -y coffeescript
+WORKDIR /app
+COPY node-rtsp-rtmp-server /app
+RUN npm install
+RUN chmod +x start_server.sh
+EXPOSE 1935
+CMD ["sh", "start_server.sh"]
+```
+Editar start_server.sh para eliminar sudo en coffee server.coffee.
 
-Crear el docker-compose.yml en la raíz de rtmp-project:
-
-(Ver sección docker-compose.yml)
-
-Construir e iniciar el servidor:
-
+## Uso
+1. Iniciar el servidor RTMP:
+```bash
 
 cd ~/rtmp-project
 docker compose up --build
-Transmisión desde OBS Studio
-Configurar OBS:
+```
 
-Servicio: Personalizado
 
-Servidor: rtmp://localhost/live
+2.En OBS Studio:
 
-Clave: stream
+- Servidor: ```rtmp://localhost/live```
 
-Iniciar transmisión desde OBS.
+- Clave: stream
 
-Reproducción con VLC
-Abrir VLC y elegir “Abrir ubicación de red”.
+3. En VLC:
+- Abrir ubicación de red:
+```rtmp://localhost/live/stream```
 
-Ingresar:
 
-rtmp://localhost/live/stream
-Reproducir y verificar la transmisión.
+4. Para ver el tráfico en Wireshark:
 
-Análisis de tráfico
-Se utilizó Wireshark para capturar paquetes RTMP en la interfaz loopback.
+- Interfaz: lo
 
-Filtro aplicado: tcp.port == 1935
+- Filtro: tcp.port == 1935
 
-Se identificaron paquetes connect, createStream y publish, además de chunks de video/audio.
+## Estado del proyecto
 
-Estructura del proyecto
-rtmp-project/
+El proyecto está: Finalizado
 
-rtmp-server/
+## Margen de mejora
 
-node-rtsp-rtmp-server/
+Áreas por mejorar:
+- Añadir interfaz web para control de la transmisión
+- Incluir autenticación RTMP
+- Configurar múltiples streams simultáneos
 
-Dockerfile
+Tareas pendientes:
+ - Agregar logging al servidor RTMP
+ - Exportar estadísticas de tráfico
+ - Crear imagen Docker personalizada pública
 
-docker-compose.yml
+## Expresiones de gratitud
 
-Autor
-Benjamín Guzmán
-Martin Huiriqueo
-Maximiliano Palma
-(Universidad Diego Portales)
+- Este proyecto se inspiró en el repositorio:
+```https://github.com/iizukanao/node-rtsp-rtmp-server```
 
-Año: 2025
+- Gracias a OBS Studio y VLC por ser herramientas libres
+
+- Agradecimientos a mi equipo docente y compañeros
+
+## Contacto
+
+Creado por:
+- Benjamín Guzmán
+- Martin Huriqueo
+- Maximiliano palma
+
+
