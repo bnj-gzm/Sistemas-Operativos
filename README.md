@@ -61,7 +61,7 @@ Objetivos:
 ## Capturas de pantalla
 
 OBS configurado como emisor RTMP:  
-![OBS Studio](imagenes/obs-config.png)
+![OBS Studio]()
 
 VLC recibiendo el stream:  
 ![VLC](imagenes/vlc-stream.png)
@@ -168,7 +168,7 @@ Tareas pendientes:
 
 Creado por:
 - Benjamín Guzmán
-- Martin Huriqueo
-- Maximiliano palma
+- Martin Huiriqueo
+- Maximiliano Palma
 
 
