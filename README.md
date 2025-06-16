@@ -67,7 +67,7 @@ VLC recibiendo el stream:
 ![VLC](obs-vlc.png)
 
 Wireshark mostrando tráfico RTMP:  
-![Wireshark](imagenes/wireshark-packets.png)
+![Wireshark](captura2.png)
 
 ---
 
