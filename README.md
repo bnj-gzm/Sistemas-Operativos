@@ -61,10 +61,10 @@ Objetivos:
 ## Capturas de pantalla
 
 OBS configurado como emisor RTMP:  
-![OBS Studio]()
+![OBS Studio](OBS.png)
 
 VLC recibiendo el stream:  
-![VLC](imagenes/vlc-stream.png)
+![VLC](obs-vlc.png)
 
 Wireshark mostrando tráfico RTMP:  
 ![Wireshark](imagenes/wireshark-packets.png)
