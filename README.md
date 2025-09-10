@@ -1,11 +1,6 @@
-#  Proyecto: Inyección y Análisis de Tráfico RTMP con Scapy (Tarea 3)
+# Chat por Pipes (C++/UNIX)
 
-Este proyecto corresponde a la Tarea 3 del curso Taller de Redes y Servicios, y tiene como objetivo analizar e intervenir el tráfico de red RTMP generado por una transmisión local entre OBS Studio (emisor) y VLC (receptor) utilizando Scapy dentro de un contenedor Docker especializado.
-
-En esta entrega se explora la manipulación directa del protocolo RTMP a través de la captura, análisis e inyección de paquetes TCP, incluyendo pruebas de fuzzing, spoofing y finalización de conexión mediante flags RST.
-
-
----
+Esta guía explica como si fueras cliente/usuario final qué es, cómo instalar, cómo ejecutar y cómo se usa este chat por pipes, sin entrar en código salvo lo justo. Al final hay una sección “bajo el capó” con detalles técnicos opcionales
 
 ## Tabla de contenido
 
@@ -331,6 +326,5 @@ El proyecto está: Finalizado
 Creado por:
 - Benjamín Guzmán
 - Martin Huiriqueo
-- Maximiliano Palma
 
 
