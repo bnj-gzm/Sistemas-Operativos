@@ -1,7 +1,10 @@
 # Chat por Pipes (C++/UNIX)
 
-Esta guía explica como si fueras cliente/usuario final qué es, cómo instalar, cómo ejecutar y cómo se usa este chat por pipes, sin entrar en código salvo lo justo.  
-Al final se incluye todo el código fuente (server, client, common.hpp y Makefile) para compilar directamente. 
+Este proyecto está orientado a que cualquier persona pueda entender de manera sencilla qué es el chat basado en pipes, cómo instalarlo en un entorno Linux, de qué forma ejecutarlo y cuáles son los pasos necesarios para utilizarlo desde la terminal.
+
+El desarrollo se centra en la experiencia práctica: se detalla el proceso de compilación, el inicio del servidor, la conexión de múltiples clientes y la puesta en marcha de las funciones principales del chat, como el envío y recepción de mensajes, la duplicación de procesos y la gestión de reportes. La explicación evita entrar en detalles de programación más allá de lo imprescindible, lo que permite enfocarse directamente en el uso del sistema.
+
+Al final se incluyen los archivos completos (server.cpp, client.cpp, common.hpp y Makefile), lo que hace posible copiarlos, compilarlos y ejecutar los binarios generados de forma inmediata, sin configuraciones adicionales ni necesidad de conocimientos avanzados de C++. 
 
 ## Tabla de contenido
 
@@ -18,13 +21,12 @@ Al final se incluye todo el código fuente (server, client, common.hpp y Makefil
 
 ## Información general
 
-royecto académico: **chat multi-proceso en terminal** que funciona **exclusivamente con pipes (FIFOs) en UNIX**, sin threads ni semáforos.  
+El sistema implementa un chat multi-proceso en terminal, que funciona exclusivamente con pipes (FIFOs) en UNIX. 
 
-Consta de:
-- **Servidor central** que acepta conexiones, difunde mensajes y coordina un proceso **reporter** para gestionar reportes.  
-- **Clientes independientes** que pueden enviar/recibir mensajes, duplicarse con `/dup` y reportar con `/report` o `reportar`.  
-- **Proceso de reportes** (reporter) que expulsa clientes con más de **10 reportes** (se les envía `SIGKILL`). 
-
+Está conformado por tres componentes principales:
+- Un servidor central, encargado de aceptar conexiones, difundir mensajes y coordinar un proceso auxiliar (reporter) que gestiona los reportes.
+- Varios clientes independientes, capaces de enviar y recibir mensajes, duplicarse mediante el comando /dup y reportar a otros procesos utilizando /report o reportar.
+- Un proceso de reportes (reporter), responsable de contabilizar las denuncias acumuladas por cada cliente y expulsar automáticamente a quienes superen las 10 advertencias, enviándoles la señal SIGKILL.
 ---
 
 ## Tecnologías utilizadas
