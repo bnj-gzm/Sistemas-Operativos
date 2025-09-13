@@ -114,21 +114,22 @@ Se crearán los binarios:
 ##  Pruebas Realizadas
 
 - Mensajes básicos → un cliente escribe, todos lo reciben.
-![Texto alternativo](cliente-1-duplicado.png)
-![Texto alternativo](img/ejemplo.png)
-![Texto alternativo](img/ejemplo.png)
+![Texto alternativo](cliente1enviandomensaje.png)
+![Texto alternativo](cliente2recibemensaje.png)
 
 - Duplicación → con /dup aparece un nuevo cliente con PID distinto.
-![Texto alternativo](img/ejemplo.png)
-![Texto alternativo](img/ejemplo.png)
+![Texto alternativo](cliente1duplicado.png)
+![Texto alternativo](cliente2mensajedelduplicado.png)
 
 - Reportes → al enviar más de 10 reportes contra un PID, el cliente es expulsado.
-![Texto alternativo](img/ejemplo.png)
-![Texto alternativo](img/ejemplo.png)
+![Texto alternativo](cliente1reportaacliente2.png)
+![Texto alternativo](killcliente2.png)
+![Texto alternativo](servercliente2removido.png)
 
 - Limpieza → clientes y servidor cierran correctamente sus FIFOs.
-![Texto alternativo](img/ejemplo.png)
-![Texto alternativo](img/ejemplo.png)
+![Texto alternativo](cliente1exit.png)
+![Texto alternativo](cliente2quesale.png)
+![Texto alternativo](servidorcerrado.png)
 
 
 ## Resultados
