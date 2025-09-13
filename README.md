@@ -40,11 +40,11 @@ Está conformado por tres componentes principales:
 
 ##  Características
 
-- Comunicación **FIFO bidireccional** (2 pipes por cliente).  
-- **Difusión** de mensajes a todos los clientes con formato `[pid] mensaje`.  
-- **Duplicación de clientes** (`/dup`).  
-- **Reportes y expulsión** automática (`reportar <pid>` o `/report <pid>`).  
-- **Sin hilos**, solo procesos + pipes.  
+- Comunicación FIFO bidireccional.  
+- Difusión de mensajes a todos los clientes con formato `[pid] mensaje`.  
+- Duplicación de clientes (`/dup`).  
+- Reportes y expulsión automática (`reportar <pid>` o `/report <pid>`).  
+- Sin hilos, solo procesos + pipes.  
 - Manejo de señales y limpieza de FIFOs al salir.
 ---
 
