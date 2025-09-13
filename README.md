@@ -103,7 +103,13 @@ Se crearán los binarios:
 /report <pid>   (o)  reportar <pid>
 /exit
 ```
-
+### 7) Cierre y limpieza
+- Clientes: /exit
+- Servidor: Ctrl+C
+- Limpiar FIFOs huérfanas (solo si quedaron):
+  ```bash
+  rm -f /tmp/c2s_* /tmp/s2c_* /tmp/chat_reg_fifo
+  ```
 
 ##  Pruebas Realizadas
 
