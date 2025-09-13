@@ -122,17 +122,33 @@ Cliente 2 recibe mensaje:
 ![Texto alternativo](cliente2recibemensaje.png)
 
 - Duplicación → con /dup aparece un nuevo cliente con PID distinto.
+
+Cliente 1 duplicado:
 ![Texto alternativo](cliente1duplicado.png)
+
+Cliente 2 mensaje del cliente 1 duplicado:
 ![Texto alternativo](cliente2mensajedelduplicado.png)
 
 - Reportes → al enviar más de 10 reportes contra un PID, el cliente es expulsado.
+
+Cliente 1 reporta a cliente 2:
 ![Texto alternativo](cliente1reportaacliente2.png)
+
+Cliente 2 es removido:
 ![Texto alternativo](killcliente2.png)
+
+Cliente 2 remivido del server:
 ![Texto alternativo](servercliente2removido.png)
 
 - Limpieza → clientes y servidor cierran correctamente sus FIFOs.
+
+Cliente 1 cierra server:
 ![Texto alternativo](cliente1exit.png)
+
+Cliente 2 es sale del servidor:
 ![Texto alternativo](cliente2quesale.png)
+
+Servidor cerrado:
 ![Texto alternativo](servidorcerrado.png)
 
 
