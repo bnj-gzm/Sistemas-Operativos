@@ -114,9 +114,11 @@ Se crearán los binarios:
 ##  Pruebas Realizadas
 
 - Mensajes básicos → un cliente escribe, todos lo reciben.
+
 Mensaje cliente 1: 
 ![Texto alternativo](cliente1enviandomensaje.png)
- Cliente 2 recibe mensaje:
+
+Cliente 2 recibe mensaje:
 ![Texto alternativo](cliente2recibemensaje.png)
 
 - Duplicación → con /dup aparece un nuevo cliente con PID distinto.
