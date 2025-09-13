@@ -527,7 +527,6 @@ static void connect_to_server() {
     mypid = getpid();
     srand((unsigned)time(nullptr) ^ (unsigned)mypid);
 
-    // 1) Crear las FIFOs únicas
     make_fifo_name(fifo_c2s, "c2s", mypid);
     make_fifo_name(fifo_s2c, "s2c", mypid);
     unlink(fifo_c2s.c_str());
@@ -537,21 +536,16 @@ static void connect_to_server() {
         perror("mkfifo"); std::exit(1);
     }
 
-    // 2) Anunciarse al servidor ANTES de abrir las FIFOs
-    //    (para que el server sepa qué rutas abrir)
     reg_fd = open(REG_FIFO, O_WRONLY);
     if (reg_fd < 0) { perror("open REG_FIFO"); std::exit(1); }
 
-    // Escribimos CONNECT y cerramos de inmediato
+ 
     dprintf(reg_fd, "CONNECT %d %s %s\n", (int)mypid, fifo_c2s.c_str(), fifo_s2c.c_str());
     close(reg_fd); reg_fd = -1;
 
-    // 3) Abrir primero s2c (lectura). Con O_NONBLOCK para no quedar colgado si el server aún no escribe.
     fd_s2c = open(fifo_s2c.c_str(), O_RDONLY | O_NONBLOCK);
     if (fd_s2c < 0) { perror("open fifo_s2c"); std::exit(1); }
 
-    // 4) Abrir c2s (escritura) en modo BLOQUEANTE (SIN O_NONBLOCK).
-    //    Así esperamos a que el server abra su extremo de lectura y evitamos ENXIO.
     fd_c2s = open(fifo_c2s.c_str(), O_WRONLY);
     if (fd_c2s < 0) { perror("open fifo_c2s"); std::exit(1); }
 
