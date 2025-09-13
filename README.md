@@ -145,7 +145,7 @@ Cliente 2 removido del server:
 Cliente 1 cierra server:
 ![Texto alternativo](cliente1exit.png)
 
-Cliente 2 es sale del servidor:
+Cliente 2 sale del servidor:
 ![Texto alternativo](cliente2quesale.png)
 
 Servidor cerrado:
