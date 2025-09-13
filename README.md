@@ -182,8 +182,8 @@ Se crearán los binarios:
 
 struct Client {
     pid_t pid{};
-    int fd_in{-1};   // cliente -> server
-    int fd_out{-1};  // server  -> cliente
+    int fd_in{-1};   
+    int fd_out{-1};  
     std::string fifo_in;
     std::string fifo_out;
     bool active{false};
@@ -192,7 +192,6 @@ struct Client {
 static std::vector<Client> clients;
 static int reg_fd = -1;
 
-// pipes anónimos con el reporter
 static int srv2rep[2] = {-1,-1};
 static int rep2srv[2] = {-1,-1};
 static pid_t reporter_pid = -1;
@@ -250,7 +249,6 @@ static void remove_client(pid_t pid, const char* reason) {
 }
 
 static void handle_killed_notice(const std::string& line) {
-    // Formato: "KILLED <pid>"
     pid_t pid = 0;
     if (sscanf(line.c_str(), "KILLED %d", &pid) == 1 && pid > 0) {
         std::cerr << "[server] Reporter indica KILLED " << pid << "\n";
@@ -261,7 +259,6 @@ static void handle_killed_notice(const std::string& line) {
 }
 
 static void handle_register(const std::string& line) {
-    // "CONNECT <pid> <fifo_in> <fifo_out>"
     char cmd[32], fifo_in[PATH_MAX], fifo_out[PATH_MAX];
     pid_t pid = 0;
     if (sscanf(line.c_str(), "%31s %d %1023s %1023s", cmd, &pid, fifo_in, fifo_out) == 4) {
@@ -308,7 +305,6 @@ static void handle_client_line(pid_t from, const std::string& raw) {
         return;
     }
 
-    // reportes
     std::string low = line;
     std::transform(low.begin(), low.end(), low.begin(),
                    [](unsigned char ch){ return (char)std::tolower(ch); });
@@ -325,7 +321,6 @@ static void handle_client_line(pid_t from, const std::string& raw) {
         return;
     }
 
-    // mensaje normal
     broadcast(line, from);
 }
 
@@ -338,7 +333,6 @@ static void split_and_each_line(const char* buf, ssize_t n, const std::function<
         cb(chunk.substr(pos, nl - pos));
         pos = nl + 1;
     }
-    // Si no termina en \n, ignoramos resto parcial (para este uso está bien).
 }
 
 static void spawn_reporter() {
@@ -350,7 +344,6 @@ static void spawn_reporter() {
         perror("fork"); std::exit(1);
     }
     if (reporter_pid == 0) {
-        // proceso hijo: reporter
         close(srv2rep[1]);
         close(rep2srv[0]);
 
@@ -385,9 +378,8 @@ static void spawn_reporter() {
         }
         std::_Exit(0);
     } else {
-        // proceso padre (server)
-        close(srv2rep[0]); // escribirá a reporter
-        close(rep2srv[1]); // leerá del reporter
+        close(srv2rep[0]); 
+        close(rep2srv[1]); 
         int flags = fcntl(rep2srv[0], F_GETFL, 0);
         fcntl(rep2srv[0], F_SETFL, flags | O_NONBLOCK);
     }
@@ -412,11 +404,8 @@ int main() {
 
     while (true) {
         pfds.clear();
-        // 0: REG_FIFO
         pfds.push_back({reg_fd, POLLIN, 0});
-        // 1: rep2srv[0]
         pfds.push_back({rep2srv[0], POLLIN, 0});
-        // clientes
         for (auto &c : clients) {
             if (!c.active) continue;
             pfds.push_back({c.fd_in, (short)(POLLIN | POLLHUP), 0});
@@ -430,7 +419,6 @@ int main() {
         }
 
         size_t idx = 0;
-        // REG_FIFO
         if (pfds[idx].revents & POLLIN) {
             ssize_t n = read(reg_fd, buf, sizeof(buf));
             if (n > 0) {
@@ -444,7 +432,6 @@ int main() {
         }
         idx++;
 
-        // reporter->server
         if (pfds[idx].revents & POLLIN) {
             ssize_t n = read(rep2srv[0], buf, sizeof(buf));
             if (n > 0) {
@@ -455,14 +442,11 @@ int main() {
         }
         idx++;
 
-        // clientes
-        // Nota: como el vector puede moverse al eliminar, iteramos con índice.
         for (size_t i = 0, clientIdxBase = 2; i < clients.size();) {
             Client &c = clients[i];
             if (!c.active) { clients.erase(clients.begin()+i); continue; }
 
-            // La posición en pfds para este cliente es (clientIdxBase + k), pero aquí
-            // simplemente buscamos por fd si hay eventos.
+
             short re = 0;
             for (size_t p = 2; p < pfds.size(); ++p) {
                 if (pfds[p].fd == c.fd_in) { re = pfds[p].revents; break; }
@@ -471,7 +455,6 @@ int main() {
             if (re & POLLHUP) {
                 std::cerr << "[server] POLLHUP de " << c.pid << "\n";
                 remove_client(c.pid, "POLLHUP");
-                // tras eliminar, reiniciamos bucle
                 i = 0;
                 continue;
             }
