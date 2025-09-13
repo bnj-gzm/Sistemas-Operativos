@@ -137,7 +137,7 @@ Cliente 1 reporta a cliente 2:
 Cliente 2 es removido:
 ![Texto alternativo](killcliente2.png)
 
-Cliente 2 remivido del server:
+Cliente 2 removido del server:
 ![Texto alternativo](servercliente2removido.png)
 
 - Limpieza → clientes y servidor cierran correctamente sus FIFOs.
