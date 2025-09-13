@@ -114,7 +114,7 @@ Se crearán los binarios:
 ##  Pruebas Realizadas
 
 - Mensajes básicos → un cliente escribe, todos lo reciben.
-![Texto alternativo](server.png)
+![Texto alternativo](cliente1enviandomensaje.png)
 ![Texto alternativo](img/ejemplo.png)
 ![Texto alternativo](img/ejemplo.png)
 
